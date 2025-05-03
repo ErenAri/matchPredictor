@@ -1,50 +1,47 @@
 // server/index.js
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
-
-console.log("🚀 Sunucu başlatılıyor...");
 
 const app = express();
 const PORT = 4000;
 
 app.use(cors());
 
-// Route'ları tanımla
-const resultRoutes = require("./results");
-app.use("/api/matches", resultRoutes);
-
-const teamMatches = require("./teamMatches");
-app.use("/api", teamMatches);
-
+// 🔗 Route bağlantıları
 const searchTeams = require("./searchTeams");
+const teamMatches = require("./teamMatches");
+const resultRoutes = require("./results");
+const allTeams = require("./allTeams");
+
 app.use("/api", searchTeams);
+app.use("/api", teamMatches);
+app.use("/api/matches", resultRoutes);
+app.use("/api", allTeams);
 
-// Bugünkü maçlar için tahmin endpoint'i
-function generatePrediction() {
-  const homeGoals = Math.round(Math.random() * 3);
-  const awayGoals = Math.round(Math.random() * 2);
-  return `${homeGoals} - ${awayGoals}`;
-}
-
+// 🔽 Süper Lig ve Şampiyonlar Ligi maçlarını çek
 app.get("/api/matches/today", async (req, res) => {
   const selectedDate = req.query.date || new Date().toISOString().split("T")[0];
   console.log("📅 Seçilen tarih:", selectedDate);
 
   try {
-    const response = await axios.get("https://v3.football.api-sports.io/fixtures", {
-      params: {
-        date: selectedDate,
-        league: "203,2",
-        season: 2024,
-      },
-      headers: {
-        "x-apisports-key": "8780c719d41a67b52b198f30cac380c3"
-      },
-    });
+    const leagues = [203, 2];
+    const results = [];
 
-    const simplified = response.data.response.map((item) => {
-      return {
+    for (let league of leagues) {
+      const response = await axios.get("https://v3.football.api-sports.io/fixtures", {
+        params: {
+          date: selectedDate,
+          league: league,
+          season: 2023,
+        },
+        headers: {
+          "x-apisports-key": process.env.APIFOOTBALL_KEY
+        },
+      });
+
+      const simplified = response.data.response.map((item) => ({
         id: item.fixture.id,
         homeTeam: item.teams.home.name,
         awayTeam: item.teams.away.name,
@@ -54,17 +51,26 @@ app.get("/api/matches/today", async (req, res) => {
         time: item.fixture.date.split("T")[1].slice(0, 5),
         prediction: generatePrediction(),
         confidence: Math.floor(Math.random() * 30 + 60),
-      };
-    });
+      }));
 
-    res.json({ matches: simplified });
+      results.push(...simplified);
+    }
+
+    res.json({ matches: results });
   } catch (error) {
     console.error("API-Football Hatası:", error.message);
-    res.status(500).json({ error: "Veri alınamadı" });
+    res.status(500).json({ error: "RapidAPI'den veri alınamadı" });
   }
 });
 
-// ✅ Sunucuyu başlat
+// Basit skor tahmini
+function generatePrediction() {
+  const homeGoals = Math.round(Math.random() * 3);
+  const awayGoals = Math.round(Math.random() * 2);
+  return `${homeGoals} - ${awayGoals}`;
+}
+
+// 🔽 Sunucu başlatılıyor
 app.listen(PORT, () => {
   console.log(`✅ API çalışıyor: http://localhost:${PORT}`);
 });

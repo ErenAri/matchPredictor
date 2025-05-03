@@ -8,14 +8,21 @@ router.get("/search-teams", async (req, res) => {
   if (!query) return res.status(400).json({ teams: [] });
 
   try {
-    const response = await axios.get("https://v3.football.api-sports.io/teams", {
-      params: { search: query },
-      headers: {
-        "x-apisports-key": "8780c719d41a67b52b198f30cac380c3"
-      }
-    });
+    const leagues = [203, 2]; // Süper Lig ve Şampiyonlar Ligi
+    let allTeams = [];
 
-    const teams = response.data.response.map((item) => ({
+    for (let league of leagues) {
+      const response = await axios.get("https://v3.football.api-sports.io/teams", {
+        params: { search: query, season: 2023, league },
+        headers: {
+          "x-apisports-key": process.env.APIFOOTBALL_KEY
+        }
+      });
+
+      allTeams.push(...response.data.response);
+    }
+
+    const teams = allTeams.map((item) => ({
       id: item.team.id,
       name: item.team.name,
       logo: item.team.logo,
